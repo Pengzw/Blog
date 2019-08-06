@@ -1,0 +1,47 @@
+在阿里云上买一个hk、新加坡或者其他国外地区， 最低配就差不多了
+
+### 需要先安装python、pip 
+
+```
+pip install shadowsocks
+
+```
+### 安装成功之后
+```
+ll /usr/local/python2.7.13/bin/ssserver 
+ln -s /usr/local/python2.7.13/bin/ssserver /usr/bin/ssserver
+
+```
+配置启动参数
+```
+vi /etc/shadowsocks.json 
+
+{
+    "server":"0.0.0.0",
+    "server_port":8388,
+    "password": "test8388",
+    "local_port":1080,
+    "timeout":300,
+    "method":"aes-256-cfb",
+    "fast_open": false
+
+}
+
+```
+
+运行 shadowsocks 服务器
+启动命令如下：如果要停止运行，将命令中的start改成stop。
+
+```
+sudo ssserver -c /etc/shadowsocks.json -d start
+```
+
+https://github.com/shadowsocks/shadowsocks/wiki/Shadowsocks-%E4%BD%BF%E7%94%A8%E8%AF%B4%E6%98%8E
+
+MAC客户端
+https://sourceforge.net/projects/shadowsocksgui/
+
+window客户端
+https://github.com/shadowsocks/shadowsocks-windows/releases
+
+刚客户端连接time out, 请查看下aliyun的安全组是不是没有开放端口
