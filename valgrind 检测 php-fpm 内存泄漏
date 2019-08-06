@@ -1,0 +1,56 @@
+这篇文章里来给大家讲解一下如何监控程序体可能存在的内存泄露。
+
+工欲善其事必先利其器，这里选择使用 Valgrind 工作来进行内存监控。http://valgrind.org/
+
+#### Valgrind工具安装
+
+```
+wget http://valgrind.org/downloads/valgrind-3.12.0.tar.bz2
+tar -jxvf valgrind-3.12.0.tar.bz2
+cd valgrind-3.12.0
+./autogen.sh
+./configure
+make
+make intall
+```
+下载地址：http://valgrind.org/downloads/current.html#current
+
+可能需要升级automake和autoconf
+
+
+#### 一次针对PHP扩展的内存泄露检测过程
+我的脚本是/etc/init.d/php-fpm，需要做两个修改：在启动脚本中增加环境变量以及将bin文件由原来的php-fpm文件修改为由valgrind启动，并将valgrind的日志重定向到日志文件中。
+
+
+```
+# Zend虚拟机使用了自己的程序来优化内存管理，因此，valgrind无法探测到大部分的内存问题。在使用valgrind执行php之前，你必须禁用Zend自带的内存管理器。
++ export USE_ZEND_ALLOC=0
+# 为了能在valgrind中正确显示extension的内存堆栈
++ export ZEND_DONT_UNLOAD_MODULES=1
+
+
+- php_fpm_BIN=${exec_prefix}/sbin/php-fpm
++ php_fpm_BIN="valgrind --leak-check=full --log-file=/data/log/valgrind-log-%p.log ${exec_prefix}/sbin/php-fpm"
+```
+
+#### 查看报告，获得总体报告如下
+
+
+```
+==20296== LEAK SUMMARY:
+==20296==    definitely lost: 0 bytes in 0 blocks
+==20296==    indirectly lost: 0 bytes in 0 blocks
+==20296==      possibly lost: 0 bytes in 0 blocks
+==20296==    still reachable: 75,936 bytes in 29 blocks
+==20296==         suppressed: 0 bytes in 0 blocks
+```
+#### 相关报告参数
+- definitely lost ：确认泄露，程序中存在内存泄露，应尽快修复。当程序结束时如果一块动态分配的内存没有被释放且通过程序内的指针变量均无法访问这块内存则会报这个错误。
+- indirectly lost：不直接泄露，当使用了含有指针成员的类或结构时可能会报这个错误。这类错误无需直接修复，他们总是与"definitely lost"一起出现，只要修复"definitely lost"即可。
+- possibly lost：可能泄露，大多数情况下应视为与"definitely lost"一样需要尽快修复，除非你的程序让一个指针指向一块动态分配的内存（但不是这块内存起始地址），然后通过运算得到这块内存起始地址，再释放它。例子可参考我的例程。当程序结束时如果一块动态分配的内存没有被释放且通过程序内的指针变量均无法访问这块内存的起始地址，但可以访问其中的某一部分数据，则会报这个错误。
+- still reachable：现在仍能访问，未丢失但也未释放。如果程序是正常结束的，那么它可能不会造成程序崩溃，但长时间运行有可能耗尽系统资源，因此笔者建议修复它。如果程序是崩溃（如访问非法的地址而崩溃）而非正常结束的，则应当暂时忽略它，先修复导致程序崩溃的错误，然后重新检测。（此参数可能和相关运行环境有关，比如当前的PHP运行环境，不一定适用于 扩展 环境）
+- suppressed：已被解决。出现了内存泄露但系统自动处理了，可以无视这类错误。
+
+
+https://mengkang.net/873.html
+
